@@ -721,3 +721,20 @@ func TestDeepSeekParser_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestDeepSeekParser_SplitOpeningTag(t *testing.T) {
+	full := `<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>get_weather<｜tool▁sep｜>{"city":"Oslo"}<｜tool▁call▁end｜><｜tool▁calls▁end｜>`
+	wantCalls := []api.ToolCall{{Function: api.ToolCallFunction{Name: "get_weather", Arguments: testArgs(map[string]any{"city": "Oslo"})}}}
+	for i := 1; i < len(full); i++ {
+		p := &DeepSeek3Parser{}
+		p.Init([]api.Tool{}, nil, &api.ThinkValue{Value: false})
+		c1, _, calls1, _ := p.Add(full[:i], false)
+		c2, _, calls2, _ := p.Add(full[i:], true)
+		if got := c1 + c2; got != "" {
+			t.Fatalf("split %d: content = %q, want empty", i, got)
+		}
+		if diff := cmp.Diff(wantCalls, append(calls1, calls2...), argsComparer); diff != "" {
+			t.Fatalf("split %d: calls mismatch (-want +got):\n%s", i, diff)
+		}
+	}
+}
