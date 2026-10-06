@@ -230,6 +230,23 @@ Available devices:
 				}},
 			},
 			{
+				name: "BLAS pseudo-device does not shift CUDA index",
+				output: `ggml_cuda_init: found 1 CUDA devices (Total VRAM: 16280 MiB):
+  Device 0: Tesla V100-PCIE-16GB, compute capability 8.6, VMM: yes, VRAM: 16280 MiB
+system_info: n_threads = 4 | CUDA : ARCHS = 860,890 |
+Available devices:
+  BLAS: OpenBLAS (0 MiB, 0 MiB free)
+  CUDA0: Tesla V100-PCIE-16GB (16280 MiB, 15000 MiB free)
+`,
+				libDirs: []string{"/lib/ollama", "/lib/ollama/cuda_v12"},
+				want: []wantDevice{{
+					name:     "CUDA0",
+					library:  "CUDA",
+					totalMiB: 16280,
+					compute:  "8.6",
+				}},
+			},
+			{
 				name:   "no devices",
 				output: "Available devices:\n",
 			},
@@ -272,6 +289,26 @@ Available devices:
 					}
 				}
 			})
+		}
+	})
+
+	t.Run("pseudo-device keeps device index dense", func(t *testing.T) {
+		output := `ggml_cuda_init: found 1 CUDA devices (Total VRAM: 16280 MiB):
+  Device 0: Tesla V100-PCIE-16GB, compute capability 8.6, VMM: yes, VRAM: 16280 MiB
+system_info: n_threads = 4 | CUDA : ARCHS = 860,890 |
+Available devices:
+  BLAS: OpenBLAS (0 MiB, 0 MiB free)
+  CUDA0: Tesla V100-PCIE-16GB (16280 MiB, 15000 MiB free)
+`
+		devices := parseLlamaServerDevicesWithNative(output, "", []string{"/lib/ollama", "/lib/ollama/cuda_v12"}, nil)
+		if len(devices) != 1 {
+			t.Fatalf("got %d devices, want 1", len(devices))
+		}
+		if devices[0].ID != "0" {
+			t.Errorf("device ID = %q, want %q (pseudo-device must not shift index)", devices[0].ID, "0")
+		}
+		if devices[0].Compute() != "8.6" {
+			t.Errorf("device compute = %q, want %q", devices[0].Compute(), "8.6")
 		}
 	})
 
