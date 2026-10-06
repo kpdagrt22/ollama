@@ -1270,3 +1270,20 @@ func TestLFM2Parser_ImagePlaceholdersPreserved(t *testing.T) {
 		})
 	}
 }
+
+func TestLFM2Parser_SplitOpeningTag(t *testing.T) {
+	full := `<|tool_call_start|>[get_weather(location="Oslo")]<|tool_call_end|>`
+	wantCalls := []api.ToolCall{{Function: api.ToolCallFunction{Name: "get_weather", Arguments: testArgs(map[string]any{"location": "Oslo"})}}}
+	for i := 1; i < len(full); i++ {
+		p := &LFM2Parser{}
+		p.Init([]api.Tool{}, nil, &api.ThinkValue{Value: false})
+		c1, _, calls1, _ := p.Add(full[:i], false)
+		c2, _, calls2, _ := p.Add(full[i:], true)
+		if got := c1 + c2; got != "" {
+			t.Fatalf("split %d: content = %q, want empty", i, got)
+		}
+		if diff := cmp.Diff(wantCalls, append(calls1, calls2...), argsComparer); diff != "" {
+			t.Fatalf("split %d: calls mismatch (-want +got):\n%s", i, diff)
+		}
+	}
+}

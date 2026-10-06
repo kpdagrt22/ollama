@@ -135,7 +135,7 @@ func (p *LFM2Parser) Add(s string, done bool) (content string, thinking string, 
 		}
 	}
 
-	events := p.parseEvents()
+	events := p.parseEvents(done)
 
 	var toolCalls []api.ToolCall
 	var contentSb strings.Builder
@@ -183,13 +183,13 @@ func (p *LFM2Parser) toolCallsAllowed(calls []api.ToolCall) bool {
 	return true
 }
 
-func (p *LFM2Parser) parseEvents() []lfm2Event {
+func (p *LFM2Parser) parseEvents(done bool) []lfm2Event {
 	var all []lfm2Event
 
 	keepLooping := true
 	for keepLooping {
 		var events []lfm2Event
-		events, keepLooping = p.eat()
+		events, keepLooping = p.eat(done)
 		if len(events) > 0 {
 			all = append(all, events...)
 		}
@@ -198,7 +198,7 @@ func (p *LFM2Parser) parseEvents() []lfm2Event {
 	return all
 }
 
-func (p *LFM2Parser) eat() ([]lfm2Event, bool) {
+func (p *LFM2Parser) eat(done bool) ([]lfm2Event, bool) {
 	var events []lfm2Event
 	bufStr := p.buffer.String()
 	if bufStr == "" {
@@ -324,6 +324,25 @@ func (p *LFM2Parser) eat() ([]lfm2Event, bool) {
 			}
 			return events, true
 		} else { // otherwise its content
+			// Hold back a partial tool-call overlap so a split opening tag
+			// is not emitted as content before the rest arrives.
+			// Mirrors Gemma4Parser / DeepSeek3Parser overlap handling.
+			if !done {
+				if overlapLen := overlap(bufStr, lfm2ToolCallStartTag); overlapLen > 0 {
+					beforePartialTag := bufStr[:len(bufStr)-overlapLen]
+					trailingLen := trailingWhitespaceLen(beforePartialTag)
+					ambiguousStart := len(beforePartialTag) - trailingLen
+
+					unambiguous := bufStr[:ambiguousStart]
+					ambiguous := bufStr[ambiguousStart:]
+					p.buffer.Reset()
+					p.buffer.WriteString(ambiguous)
+					if len(unambiguous) > 0 {
+						events = append(events, lfm2EventContent{content: unambiguous})
+					}
+					return events, false
+				}
+			}
 			p.buffer.Reset()
 			if len(bufStr) > 0 {
 				events = append(events, lfm2EventContent{content: bufStr})
