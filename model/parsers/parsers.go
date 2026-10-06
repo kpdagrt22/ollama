@@ -105,6 +105,8 @@ func ParserForName(name string) Parser {
 		return &CohereParser{}
 	case "glimmer":
 		return &GlimmerParser{}
+	case "llm-jp-4":
+		return &LLMJP4Parser{}
 	default:
 		return nil
 	}

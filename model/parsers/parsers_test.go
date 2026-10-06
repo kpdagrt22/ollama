@@ -147,6 +147,7 @@ func TestBuiltInParsersStillWork(t *testing.T) {
 		{"qwen3.5"},
 		{"ornith"},
 		{"harmony"},
+		{"llm-jp-4"},
 		{"nemotron-3-nano"},
 		{"nemotron-3.5-nano"},
 	}
